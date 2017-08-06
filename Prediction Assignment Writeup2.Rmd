@@ -1,0 +1,138 @@
+---
+    title: "Project: Practical Machine Learning"
+    author: "Vincent Lee"
+    date: "6 August 2017"
+    output: html_document
+---
+
+
+# **Assignment Writeup**
+
+
+## *Background*
+
+This project aims to predict the exercise fashion of the subjects. The data that we will be looking into is  related to weight lifting exercises done by 6 healthy subjects performing 1 set of 10 repetitions in 5 different fashions (classes).  
+
+To read more: [Weight Lifting Exerises Databse](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har#ixzz4otaww4rx)
+
+## *Training and testing data*
+
+- The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. 
+
+- Training data is downloaded from:
+[pml-training](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)pmltraining <- read.csv(file="c:/users/user/desktop/pml-training.csv", header=TRUE, sep=",")
+pmltest <- read.csv(file="c:/users/user/desktop/pml-testing.csv", header=TRUE, sep=",")
+
+- Test data is downloaded from:
+[pml-testing](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+
+- Extract the data into R environment
+```{r}
+pmltraining <- read.csv(file="c:/users/user/desktop/pml-training.csv", na.strings=c("NA",""))
+pmltest <- read.csv(file="c:/users/user/desktop/pml-testing.csv", na.strings=c("NA",""))
+```
+
+
+## *Cleaning the data*
+
+For data to be cleaned, some variables need to be taken out:
+- variables with zero and NA values 
+- variables not related to classe (variables from **column 1 to 7** i.e. 'x', 'username', '..._timestamp','new window', 'num_window')
+
+```{r}
+#Only take variables with values
+N.A.= which((sapply(1:dim(pmltraining)[2],function(x)sum(is.na(pmltraining[,x]))))==0)
+
+#clean training dataset
+pmltraining = pmltraining[, N.A.]
+pmltraining = pmltraining[,-c(1:7)]
+
+#clean testing dataset
+pmltest = pmltest[, N.A.]
+pmltest = pmltest[,-c(1:7)]
+
+```
+
+
+## *Building Prediction Models*
+
+- To build prediction models for the test data, training set needs to be partitioned first into training and testing (validating).
+
+```{r}
+library(caret)
+set.seed(32323)
+inTrain <- createDataPartition(pmltraining$classe, p=0.60, list=FALSE)
+training <- pmltraining[inTrain, ]
+testing <- pmltraining[-inTrain, ]
+```
+
+- Now, 3 models will be built to find out which predicts the best on the test data: 
+
+A) Decision trees
+B) Random Forest
+C) Generalised Boosted
+
+
+A) Decision trees
+```{r}
+#load the library
+library(caret)
+library(rpart)
+
+#define training control through k-fold cross validation where k is 3
+train_control <- trainControl(method="cv", number=3)
+
+#train the model via Decision Trees
+DtreesModel <- train(classe ~ ., data=training, trControl=train_control, method="rpart")
+```
+
+B) Random Forest
+```{r}
+library(randomForest)
+RanForModel <- train(classe~.,data=training, trControl=train_control, method ="rf")
+```
+
+C) Generalised Boosted
+```{r}
+library(gbm)
+GenBModel <- train(classe ~., data=training, trControl=train_control, method="gbm")
+```
+
+-Let's evaluate the models and compare their accuracy:
+```{r}
+#for model A
+Dtreespredict <- predict(DtreesModel,testing)
+confusionMatrix(Dtreespredict, testing$classe)
+
+#for model B
+RanForpredict <- predict(RanForModel,testing)
+confusionMatrix(RanForpredict, testing$classe)
+
+#for model C
+GenBpredict <- predict(GenBModel,testing)
+confusionMatrix(GenBpredict, testing$classe)
+```
+
+The evaluation shows that Random Forests model has highest accuracy as compared to Decision Trees and Generalised Boosted. 
+
+
+
+## *Conclusion: Predicting 20 observations using best model, Random Forests*
+
+```{r}
+#Based on pmltest
+predTesting <- predict(RanForModel, pmltest)
+pml_write = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,col.names=FALSE,row.names=FALSE,quote=FALSE)
+  }
+}
+predTesting
+
+pml_write(predTesting)
+
+```
+
